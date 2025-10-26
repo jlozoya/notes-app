@@ -4,7 +4,7 @@ import { TextInput, View, TouchableOpacity, Text } from "react-native";
 import io from "socket.io-client";
 import RichEditor from "src/components/RichEditor";
 
-const socket = io("http://YOUR_IP_OR_DOMAIN:4000");
+const socket = io(process.env.EXPO_PUBLIC_SOCKET_URL);
 
 export default function NoteEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();

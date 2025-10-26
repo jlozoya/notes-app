@@ -4,6 +4,7 @@
   "orientation": "default",
   "web": {
     "reactServerComponentRoutes": true,
+    "bundler": "metro",
     "output": "single"
   },
   "plugins": [

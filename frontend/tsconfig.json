@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "jsx": "react-jsx",
+    "jsxImportSource": "nativewind",
+    "strict": true,
     "paths": {
       "@/*": [
         "src/*"

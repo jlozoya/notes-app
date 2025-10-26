@@ -1,17 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: "class",
+  darkMode: 'class',
   content: [
-    "./src/app/**/*.{js,ts,jsx,tsx}",
-    "./src/components/**/*.{js,ts,jsx,tsx}",
-    "./src/providers/**/*.{js,ts,jsx,tsx}",
+    './App.{js,jsx,ts,tsx}',
+    './app/**/*.{js,jsx,ts,tsx}',
+    './src/app/**/*.{js,jsx,ts,tsx}',
+    './src/components/**/*.{js,jsx,ts,tsx}',
+    './src/providers/**/*.{js,jsx,ts,tsx}',
   ],
-  presets: [require("nativewind/preset")],
-  theme: {
-    extend: {},
-  },
-  future: {
-    hoverOnlyWhenSupported: true,
-  },
+  presets: [require('nativewind/preset')],
+  theme: { extend: {} },
+  future: { hoverOnlyWhenSupported: true },
   plugins: [],
 };
