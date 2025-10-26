@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
-import { AuthProvider, useAuth } from "@/providers/AuthProvider";
+import { AuthProvider, useAuth } from "src/providers/AuthProvider";
 import { ActivityIndicator, View } from "react-native";
 
 function AuthGate({ children }: { children: React.ReactNode }) {

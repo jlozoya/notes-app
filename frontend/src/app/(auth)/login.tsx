@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useRouter } from "expo-router";
 import { Platform, Text, TextInput, View, TouchableOpacity } from "react-native";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "src/providers/AuthProvider";
 
 export default function Login() {
   const { signIn } = useAuth();

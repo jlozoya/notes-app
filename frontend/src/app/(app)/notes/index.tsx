@@ -2,7 +2,8 @@ import React from "react";
 import { Link, router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, Platform, Text, TouchableOpacity, View } from "react-native";
-import { getNotes, Note, upsertNote, deleteNote } from "@/lib/notes";
+import { deleteNote, getNotes, Note, upsertNote } from "src/lib/notes";
+
 
 export default function NotesList() {
   const [notes, setNotes] = React.useState<Note[]>([]);

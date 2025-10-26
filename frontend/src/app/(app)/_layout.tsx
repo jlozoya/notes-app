@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
-import { useAuth } from "@/providers/AuthProvider";
 import { TouchableOpacity, Text } from "react-native";
+import { useAuth } from "src/providers/AuthProvider";
 
 export default function AppLayout() {
   const { signOut } = useAuth();

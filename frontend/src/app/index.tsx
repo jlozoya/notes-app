@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth } from "src/providers/AuthProvider";
 import { Platform } from "react-native";
 
 if (Platform.OS === "web") {
