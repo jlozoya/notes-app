@@ -4,7 +4,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, Platform, Text, TouchableOpacity, View } from "react-native";
 import { deleteNote, getNotes, Note, upsertNote } from "src/lib/notes";
 
-
 export default function NotesList() {
   const [notes, setNotes] = React.useState<Note[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -27,7 +26,9 @@ export default function NotesList() {
         if (!active) return;
         await load();
       })();
-      return () => { active = false; };
+      return () => {
+        active = false;
+      };
     }, [load])
   );
 
@@ -38,18 +39,17 @@ export default function NotesList() {
   };
 
   const createNote = async () => {
-    const id = Date.now().toString();
-    const newNote: Note = { id, title: "Untitled", html: "", updatedAt: Date.now() };
-    await upsertNote(newNote);
+    const draft: Note = { id: "", title: "Untitled", html: "", updatedAt: Date.now() };
+    const saved = await upsertNote(draft);
 
-    setNotes(prev => {
-      const exists = prev.some(n => n.id === id);
-      const next = exists ? prev.map(n => (n.id === id ? newNote : n)) : [newNote, ...prev];
+    setNotes((prev) => {
+      const exists = prev.some((n) => n.id === saved.id);
+      const next = exists ? prev.map((n) => (n.id === saved.id ? saved : n)) : [saved, ...prev];
       next.sort((a, b) => b.updatedAt - a.updatedAt);
       return next;
     });
 
-    router.push(`/(app)/notes/${id}`);
+    router.push(`/(app)/notes/${saved.id}`);
   };
 
   return (
@@ -66,11 +66,7 @@ export default function NotesList() {
         ItemSeparatorComponent={() => <View className="h-[1px] bg-gray-200" />}
         renderItem={({ item }) => (
           <View className="flex-row items-center justify-between py-3">
-            <Link
-              href={`/(app)/notes/${item.id}`}
-              asChild
-              onPress={blurActive}
-            >
+            <Link href={`/(app)/notes/${item.id}`} asChild onPress={blurActive}>
               <TouchableOpacity className="flex-1 pr-3">
                 <Text className="text-base font-medium">{item.title || "Untitled"}</Text>
                 <Text className="text-xs text-gray-500">

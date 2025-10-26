@@ -2,7 +2,9 @@ import React, { useEffect } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { AuthProvider, useAuth } from "src/providers/AuthProvider";
 import { ActivityIndicator, View } from "react-native";
+import Toast from "react-native-toast-message";
 import "../global.css";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -29,10 +31,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AuthGate>
-        <Slot />
-      </AuthGate>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AuthGate>
+          <Slot />
+          <Toast />
+        </AuthGate>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

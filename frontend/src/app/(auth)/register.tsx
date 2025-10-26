@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { Platform, Text, TextInput, View, TouchableOpacity } from "react-native";
 import { useAuth } from "src/providers/AuthProvider";
 
 export default function Register() {
   const { register } = useAuth();
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const emailRef = useRef<TextInput>(null);
@@ -25,7 +24,6 @@ export default function Register() {
   const onSubmit = async () => {
     blurActive();
     await register(email.trim(), password);
-    router.replace("/(app)/notes");
   };
 
   return (
