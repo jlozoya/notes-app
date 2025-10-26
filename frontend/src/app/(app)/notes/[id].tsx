@@ -5,14 +5,14 @@ import io, { Socket } from "socket.io-client";
 import RichEditor from "src/components/RichEditor";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL as string | undefined;
+const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL as string | undefined;
 const isObjectId = (v: unknown): v is string =>
   typeof v === "string" && /^[a-f0-9]{24}$/i.test(v);
 let socket: Socket | null = null;
 
 function getSocket() {
   if (!SOCKET_URL) {
-    console.warn("EXPO_PUBLIC_SOCKET_URL is missing");
+    console.warn("EXPO_PUBLIC_API_URL is missing");
     return null;
   }
   if (!socket) {

@@ -1,58 +1,91 @@
-name: Backend CI/CD 
+name: Backend CI/CD
 
 on:
   push:
     branches: [master]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [master]
+    paths:
+      - 'backend/**'
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-test-deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
-      # --- Checkout repo ---
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- Node setup ---
       - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      # --- Install dependencies ---
       - name: Install dependencies
         run: npm ci
 
-      # --- Type check & build ---
       - name: Build TypeScript
         run: npm run build
 
-      # --- Optional tests ---
       - name: Run tests
         run: npm test
-        continue-on-error: true   # remove if you want to block on tests
+        continue-on-error: true
 
-      # --- Archive build artifacts (for debug/download) ---
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: backend-dist
+          path: backend/dist/
 
-      # --- Deploy (example: Lightsail via SSH) ---
       - name: Deploy to server
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          PORT: ${{ secrets.BACKEND_PORT }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: PORT,MONGO_URI,JWT_SECRET
           script: |
-            cd /home/${{ secrets.SERVER_USER }}/notesapp/backend
-            git pull origin main
-            npm ci
+            set -e
+            APP_DIR=/home/${{ secrets.SERVER_USER }}/notesapp/backend
+
+            # pull latest code
+            cd "$APP_DIR"
+            git fetch origin master
+            git checkout master
+            git pull --ff-only origin master
+
+            # write .env from GitHub secrets
+            umask 0077
+            cat > .env <<'EOF'
+            PORT=${PORT}
+            MONGO_URI=${MONGO_URI}
+            JWT_SECRET=${JWT_SECRET}
+            EOF
+
+            # install prod deps and build (if building on server)
+            npm ci --omit=dev
             npm run build
-            pm2 restart notesapp || pm2 start dist/index.js --name notesapp
+
+            # ensure pm2 exists and (re)start app
+            command -v pm2 >/dev/null 2>&1 || npm i -g pm2
+            pm2 describe notesapp >/dev/null 2>&1 \
+              && pm2 restart notesapp \
+              || pm2 start dist/index.js --name notesapp
+            pm2 save

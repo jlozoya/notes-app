@@ -16,5 +16,14 @@
     ]
   ],
   "name": "notes-app",
-  "slug": "notes-app"
+  "slug": "notes-app",
+  "extra": {
+    "router": {
+      "origin": "https://n"
+    },
+    "eas": {
+      "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
+    }
+  },
+  "owner": "juanflv"
 }
