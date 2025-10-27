@@ -119,8 +119,9 @@ jobs:
             EOF
 
             # Install prod deps & build
-            npm ci --omit=dev
+            npm ci
             npm run build
+            npm prune --production
 
             # Start / restart with PM2
             if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
