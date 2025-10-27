@@ -84,16 +84,26 @@ jobs:
             # Create folders if they don't exist
             mkdir -p "$APP_ROOT" "$BACKEND_DIR"
 
-            # Clone repo if missing; otherwise update
-            if [ ! -d "$APP_ROOT/.git" ]; then
-              echo "Cloning repo into $APP_ROOT ..."
-              git clone --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
-            else
-              echo "Updating repo in $APP_ROOT ..."
+            # Clone or update repo under $APP_ROOT
+            if [ -d "$APP_ROOT/.git" ]; then
+              echo "Updating existing git repo in $APP_ROOT ..."
               cd "$APP_ROOT"
               git fetch origin "$BRANCH"
               git checkout "$BRANCH"
               git pull --ff-only origin "$BRANCH"
+            else
+              if [ -d "$APP_ROOT" ] && [ "$(ls -A "$APP_ROOT")" ]; then
+                echo "Directory exists but is not a git repo. Initializing and linking remote..."
+                cd "$APP_ROOT"
+                git init
+                # add or update remote
+                git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL"
+                git fetch origin "$BRANCH"
+                git checkout -B "$BRANCH" "origin/$BRANCH"
+              else
+                echo "Cloning repo into $APP_ROOT ..."
+                git clone --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
+              fi
             fi
 
             # Ensure backend dir exists after clone (create if missing)
