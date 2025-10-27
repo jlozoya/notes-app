@@ -48,7 +48,6 @@ jobs:
         with:
           name: backend-dist
           path: backend/dist/
-
       - name: Deploy to server
         if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@v1.2.0
@@ -56,22 +55,53 @@ jobs:
           PORT: ${{ secrets.BACKEND_PORT }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REPO_URL: https://github.com/jlozoya/notes-app.git
+          BRANCH: master
+          APP_NAME: notesapp
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: PORT,MONGO_URI,JWT_SECRET
+          envs: PORT,MONGO_URI,JWT_SECRET,REPO_URL,BRANCH,APP_NAME
           script: |
-            set -e
-            APP_DIR=/home/${{ secrets.SERVER_USER }}/notesapp/backend
+            set -euo pipefail
 
-            # pull latest code
-            cd "$APP_DIR"
-            git fetch origin master
-            git checkout master
-            git pull --ff-only origin master
+            # Choose a base directory under the SSH user’s HOME
+            APP_ROOT="$HOME/notesapp"
+            BACKEND_DIR="$APP_ROOT/backend"
 
-            # write .env from GitHub secrets
+            # Ensure git & node available (optional: adjust to your stack)
+            if ! command -v git >/dev/null; then
+              sudo apt-get update -y && sudo apt-get install -y git
+            fi
+            if ! command -v node >/dev/null; then
+              # Install Node.js 20 (Nodesource)
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
+            if ! command -v pm2 >/dev/null; then
+              sudo npm i -g pm2
+            fi
+
+            # Create app root if missing
+            mkdir -p "$APP_ROOT"
+
+            # Clone repo if the directory (or .git) is missing; otherwise update
+            if [ ! -d "$APP_ROOT/.git" ]; then
+              echo "Cloning repo into $APP_ROOT ..."
+              git clone --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
+            else
+              echo "Updating repo in $APP_ROOT ..."
+              cd "$APP_ROOT"
+              git fetch origin "$BRANCH"
+              git checkout "$BRANCH"
+              git pull --ff-only origin "$BRANCH"
+            fi
+
+            # Enter backend folder
+            cd "$BACKEND_DIR"
+
+            # Write .env from GitHub secrets
             umask 0077
             cat > .env <<'EOF'
             PORT=${PORT}
@@ -79,13 +109,16 @@ jobs:
             JWT_SECRET=${JWT_SECRET}
             EOF
 
-            # install prod deps and build (if building on server)
+            # Install prod deps & build
             npm ci --omit=dev
             npm run build
 
-            # ensure pm2 exists and (re)start app
-            command -v pm2 >/dev/null 2>&1 || npm i -g pm2
-            pm2 describe notesapp >/dev/null 2>&1 \
-              && pm2 restart notesapp \
-              || pm2 start dist/index.js --name notesapp
+            # Start / restart with PM2
+            if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+              pm2 restart "$APP_NAME"
+            else
+              pm2 start dist/index.js --name "$APP_NAME"
+            fi
             pm2 save
+
+            echo "Deploy complete at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
