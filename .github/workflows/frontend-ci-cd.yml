@@ -73,10 +73,10 @@ jobs:
         if: env.EAS_ANDROID_READY != '1'
         run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' to generate/upload a keystore."
 
-      # --- (Optional) Classic OTA publish on master ---
-      - name: Publish OTA update
-        if: github.ref == 'refs/heads/master'
-        run: npx expo publish --non-interactive
+      # --- OTA publish on master ---
+      #- name: Publish OTA update
+      #  if: github.ref == 'refs/heads/master'
+      #  run: npx expo publish --non-interactive
   deploy-web:
     needs: build-mobile
     if: github.ref == 'refs/heads/master'
