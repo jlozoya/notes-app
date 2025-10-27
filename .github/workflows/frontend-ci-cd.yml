@@ -24,6 +24,12 @@ jobs:
     env:
       # Expo non-interactive auth
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Set this secret to "1" after Android keystore is configured (eas credentials -p android)
+      EAS_ANDROID_READY: ${{ secrets.EAS_ANDROID_READY }}
+
+      # (Optional) public runtime envs
+      EXPO_PUBLIC_SOCKET_URL: https://notesapp.lozoya.org:4040
+      EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org:4040
 
     steps:
       # --- Checkout repo ---
@@ -53,9 +59,19 @@ jobs:
           npm i -g eas-cli
           npm i -g expo-cli || true
 
-      # --- Build with EAS (remote) ---
-      - name: Build (EAS)
-        run: eas build --platform all --non-interactive --profile production
+      # --- Build iOS (always ok in CI when configured) ---
+      - name: Build iOS (EAS)
+        run: eas build --platform ios --non-interactive --profile production
+
+      # --- Build Android only when keystore is ready ---
+      - name: Build Android (EAS)
+        if: env.EAS_ANDROID_READY == '1'
+        run: eas build --platform android --non-interactive --profile production
+
+      # --- Friendly message when skipping Android ---
+      - name: Skip Android (keystore not configured)
+        if: env.EAS_ANDROID_READY != '1'
+        run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' (generate or upload keystore)."
 
       # --- (Optional) Classic OTA publish on master ---
       - name: Publish OTA update

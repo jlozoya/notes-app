@@ -31,7 +31,18 @@
     },
     "eas": {
       "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
-    },
+    }
   },
-  "owner": "juanflv"
+  "owner": "juanflv",
+  "expo": {
+    "android": {
+      "versionCode": 2
+    },
+    "extra": {
+      "eas": {
+        "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
+      }
+    },
+    "owner": "juanflv"
+  }
 }
