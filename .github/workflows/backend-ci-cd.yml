@@ -46,8 +46,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-dist
-          path: backend/dist/
+          name: backend-src
+          path: backend/src/
       - name: Deploy to server
         if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@v1.2.0
@@ -127,7 +127,7 @@ jobs:
             if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
               pm2 restart "$APP_NAME"
             else
-              pm2 start dist/index.js --name "$APP_NAME"
+              pm2 start src/index.js --name "$APP_NAME"
             fi
             pm2 save
 
