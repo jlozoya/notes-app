@@ -66,16 +66,14 @@ jobs:
           script: |
             set -euo pipefail
 
-            # Choose a base directory under the SSH user’s HOME
             APP_ROOT="$HOME/notesapp"
             BACKEND_DIR="$APP_ROOT/backend"
 
-            # Ensure git & node available (optional: adjust to your stack)
+            # Ensure git, node, pm2 exist
             if ! command -v git >/dev/null; then
               sudo apt-get update -y && sudo apt-get install -y git
             fi
             if ! command -v node >/dev/null; then
-              # Install Node.js 20 (Nodesource)
               curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
               sudo apt-get install -y nodejs
             fi
@@ -83,10 +81,10 @@ jobs:
               sudo npm i -g pm2
             fi
 
-            # Create app root if missing
-            mkdir -p "$APP_ROOT"
+            # Create folders if they don't exist
+            mkdir -p "$APP_ROOT" "$BACKEND_DIR"
 
-            # Clone repo if the directory (or .git) is missing; otherwise update
+            # Clone repo if missing; otherwise update
             if [ ! -d "$APP_ROOT/.git" ]; then
               echo "Cloning repo into $APP_ROOT ..."
               git clone --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
@@ -98,7 +96,8 @@ jobs:
               git pull --ff-only origin "$BRANCH"
             fi
 
-            # Enter backend folder
+            # Ensure backend dir exists after clone (create if missing)
+            mkdir -p "$BACKEND_DIR"
             cd "$BACKEND_DIR"
 
             # Write .env from GitHub secrets

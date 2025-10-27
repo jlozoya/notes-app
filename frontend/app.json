@@ -7,6 +7,14 @@
     "bundler": "metro",
     "output": "single"
   },
+  "android": {
+    "package": "org.lozoya.notesapp",
+    "versionCode": 1
+  },
+  "ios": {
+    "bundleIdentifier": "org.lozoya.notesapp",
+    "buildNumber": "1.0.0"
+  },
   "plugins": [
     [
       "expo-router",
@@ -23,7 +31,8 @@
     },
     "eas": {
       "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
-    }
+    },
+    "EXPO_PUBLIC_API_URL": process.env.EXPO_PUBLIC_API_URL
   },
   "owner": "juanflv"
 }
