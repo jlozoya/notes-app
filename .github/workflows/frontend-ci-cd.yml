@@ -60,8 +60,8 @@ jobs:
           npm i -g expo-cli || true
 
       # --- Build iOS (always) ---
-      - name: Build iOS (EAS)
-        run: eas build --platform ios --non-interactive --profile production
+      #- name: Build iOS (EAS)
+      #  run: eas build --platform ios --non-interactive --profile production
 
       # --- Build Android only when keystore is ready ---
       - name: Build Android (EAS)
