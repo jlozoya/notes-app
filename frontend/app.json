@@ -1,47 +1,33 @@
 {
-  "scheme": "acme",
-  "userInterfaceStyle": "automatic",
-  "orientation": "default",
-  "web": {
-    "reactServerComponentRoutes": true,
-    "bundler": "metro",
-    "output": "single"
-  },
-  "android": {
-    "package": "org.lozoya.notesapp",
-    "versionCode": 1
-  },
-  "ios": {
-    "bundleIdentifier": "org.lozoya.notesapp",
-    "buildNumber": "1.0.0"
-  },
-  "plugins": [
-    [
-      "expo-router",
-      {
-        "origin": "https://n"
-      }
-    ]
-  ],
-  "name": "notes-app",
-  "slug": "notes-app",
-  "extra": {
-    "router": {
-      "origin": "https://n"
-    },
-    "eas": {
-      "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
-    }
-  },
-  "owner": "juanflv",
   "expo": {
+    "name": "notes-app",
+    "slug": "notes-app",
+    "scheme": "acme",
+    "userInterfaceStyle": "automatic",
+    "orientation": "default",
+    "web": {
+      "reactServerComponentRoutes": true,
+      "bundler": "metro",
+      "output": "single"
+    },
     "android": {
+      "package": "org.lozoya.notesapp",
       "versionCode": 2
     },
+    "ios": {
+      "bundleIdentifier": "org.lozoya.notesapp",
+      "buildNumber": "1.0.0"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        { "origin": "https://n" }
+      ]
+    ],
+    "version": "1.0.0",
     "extra": {
-      "eas": {
-        "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
-      }
+      "router": { "origin": "https://n" },
+      "eas": { "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae" }
     },
     "owner": "juanflv"
   }
