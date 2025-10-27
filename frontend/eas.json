@@ -12,7 +12,7 @@
     },
     "production": {
       "developmentClient": false,
-      "autoIncrement": "version",
+      "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
       },

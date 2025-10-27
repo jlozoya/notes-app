@@ -113,9 +113,9 @@ jobs:
             # Write .env from GitHub secrets
             umask 0077
             cat > .env <<'EOF'
-            PORT=${PORT}
-            MONGO_URI=${MONGO_URI}
-            JWT_SECRET=${JWT_SECRET}
+            PORT=${{secrets.SERVER_PORT}}
+            MONGO_URI=${{secrets.MONGO_URI}}
+            JWT_SECRET=${{secrets.JWT_SECRET}}
             EOF
 
             # Install prod deps & build
