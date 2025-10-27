@@ -12,23 +12,35 @@
     },
     "android": {
       "package": "org.lozoya.notesapp",
-      "versionCode": 2
+      "runtimeVersion": "1.0.0"
     },
     "ios": {
       "bundleIdentifier": "org.lozoya.notesapp",
-      "buildNumber": "1.0.0"
+      "buildNumber": "1.0.0",
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "plugins": [
       [
         "expo-router",
-        { "origin": "https://n" }
-      ]
+        {
+          "origin": "https://n"
+        }
+      ],
     ],
     "version": "1.0.0",
     "extra": {
-      "router": { "origin": "https://n" },
-      "eas": { "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae" }
+      "router": {
+        "origin": "https://n"
+      },
+      "eas": {
+        "projectId": "098729e7-da59-4a42-8d80-f1adebe50aae"
+      }
     },
-    "owner": "juanflv"
+    "owner": "juanflv",
+    "updates": {
+      "url": "https://u.expo.dev/098729e7-da59-4a42-8d80-f1adebe50aae"
+    }
   }
 }

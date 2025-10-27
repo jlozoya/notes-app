@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-mobile:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -77,3 +77,43 @@ jobs:
       - name: Publish OTA update
         if: github.ref == 'refs/heads/master'
         run: npx expo publish --non-interactive
+  deploy-web:
+    needs: build-mobile
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build static web export (Expo SDK 49/50+ outputs to ./dist)
+      - name: Build web
+        env:
+          EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org:4040
+        run: npx expo export -p web
+
+      # Prepare SSH agent using your Lightsail private key
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      # Rsync the build to the server
+      - name: Upload web build to Lightsail
+        run: |
+          rsync -az --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./dist/ \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:notesapp/frontend/
