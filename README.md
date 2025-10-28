@@ -7,6 +7,7 @@ A full-stack **collaborative note-taking app** built with:
 - **MongoDB** as the database  
 - **Socket.IO** for real-time collaboration  
 - **GitHub Actions** for CI/CD automation  
+- **Apache (Lightsail)** as a **reverse proxy** for secure HTTPS routing  
 
 ---
 
@@ -46,8 +47,8 @@ This project uses **two independent pipelines** managed via GitHub Actions:
 
 ### 🔧 1. Environment variables (`backend/.env`)
 ```bash
-PORT=4000
-MONGO_URI=mongodb+srv://<user>:<pass>@cluster.mongodb.net/notesapp
+PORT=4040
+MONGO_URI=mongodb://<user>:<pass>@127.0.0.1:27017/notesapp?authSource=notesapp
 JWT_SECRET=supersecret
 ````
 
@@ -59,7 +60,7 @@ npm install
 npm run dev
 ```
 
-Runs with live reload using **ts-node-dev** on [http://localhost:4000](http://localhost:4000)
+Runs with live reload using **ts-node-dev** on [http://localhost:4040](http://localhost:4040)
 
 ---
 
@@ -67,7 +68,7 @@ Runs with live reload using **ts-node-dev** on [http://localhost:4000](http://lo
 
 ```bash
 docker build -t notes-backend .
-docker run -p 4000:4000 --env-file .env notes-backend
+docker run -p 4040:4040 --env-file .env notes-backend
 ```
 
 ---
@@ -109,13 +110,92 @@ pm2 start dist/index.js --name notesapp
 
 #### Required GitHub Secrets:
 
-| Secret           | Description                          |
-| ---------------- | ------------------------------------ |
-| `SERVER_HOST`    | Server IP address                    |
-| `SERVER_USER`    | SSH username (e.g. ubuntu)           |
-| `SERVER_SSH_KEY` | Private SSH key (for GitHub Actions) |
+| Secret              | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| `SERVER_HOST`       | Server IP address                                |
+| `SERVER_USER`       | SSH username (e.g. ubuntu / bitnami)             |
+| `SERVER_SSH_KEY`    | Private SSH key for deployment                   |
+| `EXPO_TOKEN`        | Authentication token from expo to build on movil |
+| `EAS_ANDROID_READY` | Expo/EAS variable                                |
+
 
 Your backend redeploys automatically after each push to `main`.
+
+---
+
+## 🌍 Reverse Proxy (Apache on AWS Lightsail)
+
+The backend runs on **port 4040**, while **Apache** handles HTTPS requests on port **443** and proxies them internally to the Node server.
+
+This ensures:
+
+* Secure SSL termination
+* A single unified domain (`https://notesapp.lozoya.org`) for both frontend and backend
+* Proper Socket.IO WebSocket upgrades
+
+---
+
+### 🔁 Apache VirtualHost Configuration
+
+📄 `/opt/bitnami/apache/conf/vhosts/notesapp.lozoya.org.conf`
+
+```apache
+<VirtualHost *:80>
+  ServerName notesapp.lozoya.org
+  RewriteEngine On
+  RewriteRule ^/(.*)$ https://notesapp.lozoya.org/$1 [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+  ServerName notesapp.lozoya.org
+
+  SSLEngine on
+  SSLCertificateFile      "/opt/bitnami/apache/conf/notesapp.lozoya.org.crt"
+  SSLCertificateKeyFile   "/opt/bitnami/apache/conf/notesapp.lozoya.org.key"
+
+  # Static web app (Expo web build)
+  DocumentRoot "/home/bitnami/notesapp/frontend"
+  <Directory "/home/bitnami/notesapp/frontend">
+    Options FollowSymLinks
+    AllowOverride None
+    Require all granted
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/api/
+    RewriteCond %{REQUEST_URI} !^/socket\.io/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /index.html [L]
+  </Directory>
+
+  # Proxy WebSocket (Socket.IO)
+  ProxyPass        /socket.io/  ws://127.0.0.1:4040/socket.io/ retry=0 timeout=30
+  ProxyPassReverse /socket.io/  ws://127.0.0.1:4040/socket.io/
+  ProxyPass        /socket.io/  http://127.0.0.1:4040/socket.io/
+  ProxyPassReverse /socket.io/  http://127.0.0.1:4040/socket.io/
+
+  # Proxy REST API
+  ProxyPass        /api/        http://127.0.0.1:4040/api/ connectiontimeout=5 timeout=60 keepalive=On
+  ProxyPassReverse /api/        http://127.0.0.1:4040/api/
+
+  # Optional: health check
+  ProxyPass        /healthz     http://127.0.0.1:4040/healthz
+  ProxyPassReverse /healthz     http://127.0.0.1:4040/healthz
+
+  RequestHeader set X-Forwarded-Proto "https"
+  RequestHeader set X-Forwarded-Host  "notesapp.lozoya.org"
+  RequestHeader set X-Forwarded-Port  "443"
+
+  ErrorLog  "/opt/bitnami/apache/logs/notesapp-error.log"
+  CustomLog "/opt/bitnami/apache/logs/notesapp-access.log" combined
+</VirtualHost>
+```
+
+✅ This configuration:
+
+* Redirects HTTP → HTTPS
+* Serves your frontend from `/home/bitnami/notesapp/frontend`
+* Proxies `/api/*` and `/socket.io/*` requests to your Node backend on `127.0.0.1:4040`
+* Supports real-time WebSocket connections
 
 ---
 
@@ -135,28 +215,13 @@ Start the Expo dev server and scan the QR code with Expo Go (Android/iOS).
 
 ### 🔐 2. Expo / EAS configuration
 
-Make sure you have an `eas.json` in `client/`:
-
-```json
-{
-  "build": {
-    "production": {
-      "android": { "buildType": "app-bundle" },
-      "ios": { "simulator": false },
-      "autoIncrement": true
-    }
-  },
-  "submit": {
-    "production": {}
-  }
-}
-```
-
-Log in locally:
+Ensure `EXPO_PUBLIC_API_URL` points to the production domain:
 
 ```bash
-eas login
+EXPO_PUBLIC_API_URL=https://notesapp.lozoya.org
 ```
+
+This makes all API and WebSocket calls go through Apache’s secure proxy.
 
 ---
 
@@ -168,78 +233,43 @@ Workflow:
 Triggered on push to `main`:
 
 1. Installs dependencies
-2. Runs Jest tests
-3. Logs into Expo using secrets
-4. Builds the app via **EAS Build**
-5. Publishes Over-The-Air (OTA) updates automatically
-
-#### Required GitHub Secrets:
-
-| Secret                   | Description                                   |
-| ------------------------ | --------------------------------------------- |
-| `EXPO_USERNAME`          | Your Expo account email                       |
-| `EXPO_PASSWORD`          | Expo account password or access token         |
-| *(optional)* `EAS_TOKEN` | Personal EAS token for non-interactive builds |
-
----
-
-### 🚀 4. Build commands
-
-#### Android / iOS release builds:
-
-```bash
-npx eas build --platform android --profile production
-npx eas build --platform ios --profile production
-```
-
-#### OTA (Over-The-Air) update:
-
-```bash
-npx expo publish
-```
+2. Logs into Expo
+3. Builds via **EAS Build**
+4. Publishes OTA updates
 
 ---
 
 ## 🔄 Combined CI/CD Workflow
 
-Both pipelines can run in parallel under a single GitHub workflow:
-
-* **Backend** → SSH deploy via PM2
-* **Client** → Expo build & publish via EAS
-
-All automatic on push to `main`.
+| Service                 | Deployment                 | Technology                           |
+| ----------------------- | -------------------------- | ------------------------------------ |
+| **Backend**             | AWS Lightsail              | Node.js + PM2 + Apache reverse proxy |
+| **Frontend (Expo Web)** | Apache (served statically) | Expo export + GitHub Actions rsync   |
+| **Mobile (Expo EAS)**   | Expo Cloud                 | OTA + App Store builds               |
 
 ---
 
-## 🧠 Tips & Maintenance
+## 🧠 Maintenance Tips
 
-* Run `pm2 save` and `pm2 startup` to keep backend running after reboot.
-* Use `pm2 logs notesapp` to monitor logs.
-* Check Expo build status at [https://expo.dev/accounts](https://expo.dev/accounts).
-* Rotate your `SERVER_SSH_KEY` and Expo tokens regularly for security.
+* Use `pm2 logs notesapp` to monitor backend logs.
+* Rotate your SSH key and tokens regularly.
+* Check Apache logs at `/opt/bitnami/apache/logs/notesapp-error.log`.
+* Restart Apache with `sudo /opt/bitnami/ctlscript.sh restart apache`.
+* Visit [https://notesapp.lozoya.org/healthz](https://notesapp.lozoya.org/healthz) to verify backend health.
 
 ---
 
 ## 🧩 Tech Stack Summary
 
-| Layer      | Technology                                 |
-| ---------- | ------------------------------------------ |
-| Frontend   | React Native (Expo), NativeWind (Tailwind) |
-| Backend    | Node.js, Express, Socket.IO                |
-| Database   | MongoDB (Atlas)                            |
-| Auth       | JWT                                        |
-| Realtime   | Socket.IO                                  |
-| Deployment | GitHub Actions + PM2 + Expo EAS            |
-
----
-
-## 🏁 End-to-End Flow
-
-1. Developer commits → pushes to `main`
-2. GitHub Actions builds backend + client
-3. Backend deploys automatically to Lightsail
-4. Client publishes via Expo (OTA or app store builds)
-5. All users instantly get updated versions
+| Layer       | Technology                                 |
+| ----------- | ------------------------------------------ |
+| Frontend    | React Native (Expo), NativeWind (Tailwind) |
+| Web Hosting | Apache (Lightsail)                         |
+| Backend     | Node.js, Express, Socket.IO                |
+| Database    | MongoDB (Atlas)                            |
+| Auth        | JWT                                        |
+| Realtime    | Socket.IO                                  |
+| Deployment  | GitHub Actions + PM2 + Apache + Expo EAS   |
 
 ---
 
