@@ -16,68 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-mobile:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    env:
-      # Expo non-interactive auth (set this in repo secrets)
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      # Set to "1" AFTER you generate/upload Android keystore (eas credentials -p android)
-      EAS_ANDROID_READY: ${{ secrets.EAS_ANDROID_READY }}
-
-      # Public runtime envs embedded in the app bundle
-      EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
-
-    steps:
-      # --- Checkout repo ---
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # --- Setup Node in the frontend/ context ---
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      # --- Install deps (frontend/) ---
-      - name: Install dependencies
-        run: npm ci
-
-      # --- Run tests (adjust/skip if none) ---
-      - name: Run tests
-        run: npm test
-        continue-on-error: true  # set to false if you want to fail on tests
-
-      # --- Install EAS CLI (Expo classic CLI optional) ---
-      - name: Install EAS/Expo CLI
-        run: |
-          npm i -g eas-cli
-          npm i -g expo-cli || true
-
-      # --- Build iOS (always) ---
-      #- name: Build iOS (EAS)
-      #  run: eas build --platform ios --non-interactive --profile production
-
-      # --- Build Android only when keystore is ready ---
-      - name: Build Android (EAS)
-        if: env.EAS_ANDROID_READY == '1'
-        run: eas build --platform android --non-interactive --profile production
-
-      # --- Friendly message when skipping Android ---
-      - name: Skip Android (keystore not configured)
-        if: env.EAS_ANDROID_READY != '1'
-        run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' to generate/upload a keystore."
-
-      # --- OTA publish on master ---
-      #- name: Publish OTA update
-      #  if: github.ref == 'refs/heads/master'
-      #  run: npx expo publish --non-interactive
   deploy-web:
-    needs: build-mobile
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     defaults:
@@ -93,26 +32,55 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
       - name: Install dependencies
         run: npm ci
-
-      # Build static web export (Expo SDK 49/50+ outputs to ./dist)
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
       - name: Build web
         env:
           EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
         run: npx expo export -p web
-
-      # Prepare SSH agent using your Lightsail private key
       - name: Configure SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
-
-      # Rsync the build to the server
       - name: Upload web build to Lightsail
         run: |
           rsync -az --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             ./dist/ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:notesapp/frontend/
+  build-mobile:
+    needs: deploy-web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_ANDROID_READY: ${{ secrets.EAS_ANDROID_READY }}
+      EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install EAS/Expo CLI
+        run: |
+          npm i -g eas-cli
+          npm i -g expo-cli || true
+      #- name: Build iOS (EAS)
+      #  run: eas build --platform ios --non-interactive --profile production
+      - name: Build Android (EAS)
+        if: env.EAS_ANDROID_READY == '1'
+        run: eas build --platform android --non-interactive --profile production
+      - name: Skip Android (keystore not configured)
+        if: env.EAS_ANDROID_READY != '1'
+        run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' to generate/upload a keystore."
