@@ -1,4 +1,3 @@
-```markdown
 # 📱🖥️ Collaborative Notes App
 
 A full-stack **collaborative note-taking app** built with:
@@ -18,7 +17,7 @@ This project uses **two independent pipelines** managed via GitHub Actions:
 | Component | Stack | Deployment Target |
 |------------|--------|-------------------|
 | **Backend API** | Node.js + Express + MongoDB | AWS Lightsail / EC2 instance |
-| **Mobile Client** | React Native + Expo + EAS | Expo Cloud (EAS Build & OTA Updates) |
+| **Hybrid Client** | React Native + Expo + EAS | Expo Cloud (EAS Build & OTA Updates) |
 
 ---
 
@@ -33,7 +32,7 @@ This project uses **two independent pipelines** managed via GitHub Actions:
 │   └── .github/workflows/ci-cd.yml
 │
 ├── client/                 # React Native + Expo app
-│   ├── App.tsx
+│   ├── src/
 │   ├── package.json
 │   └── .github/workflows/react-native-ci.yml
 │
@@ -46,13 +45,14 @@ This project uses **two independent pipelines** managed via GitHub Actions:
 ## ⚙️ Backend Setup (Node.js Server)
 
 ### 🔧 1. Environment variables (`backend/.env`)
+
 ```bash
 PORT=4040
 MONGO_URI=mongodb://<user>:<pass>@127.0.0.1:27017/notesapp?authSource=notesapp
 JWT_SECRET=supersecret
 ````
 
-### 🧩 2. Local development
+### 🧩 2. Local backend development
 
 ```bash
 cd backend
@@ -60,16 +60,7 @@ npm install
 npm run dev
 ```
 
-Runs with live reload using **ts-node-dev** on [http://localhost:4040](http://localhost:4040)
-
----
-
-### 🐳 Optional: Docker (local)
-
-```bash
-docker build -t notes-backend .
-docker run -p 4040:4040 --env-file .env notes-backend
-```
+Runs with live reload using **ts-node-dev** on [http://localhost:4000](http://localhost:4000)
 
 ---
 
@@ -135,7 +126,7 @@ This ensures:
 
 ---
 
-### 🔁 Apache VirtualHost Configuration
+### 🔁 Apache VirtualHost Configuration (example)
 
 📄 `/opt/bitnami/apache/conf/vhosts/notesapp.lozoya.org.conf`
 
@@ -178,8 +169,8 @@ This ensures:
   ProxyPassReverse /api/        http://127.0.0.1:4040/api/
 
   # Optional: health check
-  ProxyPass        /healthz     http://127.0.0.1:4040/healthz
-  ProxyPassReverse /healthz     http://127.0.0.1:4040/healthz
+  ProxyPass        /health     http://127.0.0.1:4040/health
+  ProxyPassReverse /health     http://127.0.0.1:4040/health
 
   RequestHeader set X-Forwarded-Proto "https"
   RequestHeader set X-Forwarded-Host  "notesapp.lozoya.org"
@@ -254,8 +245,8 @@ Triggered on push to `main`:
 * Use `pm2 logs notesapp` to monitor backend logs.
 * Rotate your SSH key and tokens regularly.
 * Check Apache logs at `/opt/bitnami/apache/logs/notesapp-error.log`.
-* Restart Apache with `sudo /opt/bitnami/ctlscript.sh restart apache`.
-* Visit [https://notesapp.lozoya.org/healthz](https://notesapp.lozoya.org/healthz) to verify backend health.
+* Restart Apache with `sudo /opt/bitnami/ctlscript.sh restart apache` if mount using apache.
+* Visit [https://notesapp.lozoya.org/health](https://notesapp.lozoya.org/health) to verify backend health.
 
 ---
 
@@ -276,11 +267,8 @@ Triggered on push to `main`:
 ## 📧 Support / Contributors
 
 **Author:** [Juan Fernando Lozoya Valdez](https://github.com/jlozoya)
-**Email:** [juan@lozoya.org](mailto:juan@lozoya.org)
 **License:** MIT
 
 ---
 
 > *“Write once, sync everywhere — notes that stay live in real time.”*
-
-```

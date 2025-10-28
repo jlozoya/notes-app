@@ -1,4 +1,3 @@
-```markdown
 # 🖥️ Collaborative Notes Backend
 
 This is the backend API for the **Collaborative Notes App**, built with:
@@ -233,6 +232,3 @@ npm test
 MIT © 2025 [Juan Fernando Lozoya Valdez](https://github.com/jlozoya)
 
 > *“Write once, sync everywhere — real-time collaboration made simple.”*
-
-
-```
