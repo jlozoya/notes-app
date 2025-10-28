@@ -59,36 +59,24 @@ export default function RichEditor({ initialContent, onChangeHtml }: Props) {
   }, [initialContent]);
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
-      <View style={{ flex: 1, paddingBottom: 56 + insets.bottom }}>
-        <RichText editor={editor} />
-      </View>
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingBottom: insets.bottom,
-          zIndex: 10,
-          elevation: 10
-        }}
-        pointerEvents="box-none"
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={insets.bottom}
       >
+        <View style={{ flex: 1, paddingBottom: 56 }}>
+          <RichText editor={editor} />
+        </View>
+
         <View
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            paddingBottom: insets.bottom,
-            zIndex: 10,
-            elevation: 10,
-            backgroundColor: "#fff",
             borderTopWidth: 1,
             borderTopColor: "#e5e7eb",
-            minHeight: 56
+            backgroundColor: "#fff",
+            minHeight: 56,
+            paddingBottom: insets.bottom,
+            justifyContent: "center",
           }}
         >
           <Toolbar editor={editor} />
