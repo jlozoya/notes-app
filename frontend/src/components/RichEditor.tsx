@@ -64,10 +64,33 @@ export default function RichEditor({ initialContent, onChangeHtml }: Props) {
         <RichText editor={editor} />
       </View>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingBottom: insets.bottom }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingBottom: insets.bottom,
+          zIndex: 10,
+          elevation: 10
+        }}
+        pointerEvents="box-none"
       >
-        <View style={{ backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#e5e7eb" }}>
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingBottom: insets.bottom,
+            zIndex: 10,
+            elevation: 10,
+            backgroundColor: "#fff",
+            borderTopWidth: 1,
+            borderTopColor: "#e5e7eb",
+            minHeight: 56
+          }}
+        >
           <Toolbar editor={editor} />
         </View>
       </KeyboardAvoidingView>

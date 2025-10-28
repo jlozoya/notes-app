@@ -1,34 +1,35 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { TextInput, View } from "react-native";
-import io, { Socket } from "socket.io-client";
-import RichEditor from "src/components/RichEditor";
+import { io, Socket } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import RichEditor from "src/components/RichEditor";
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL as string | undefined;
 const isObjectId = (v: unknown): v is string =>
   typeof v === "string" && /^[a-f0-9]{24}$/i.test(v);
-let socket: Socket | null = null;
 
-function getSocket() {
+let socketSingleton: Socket | null = null;
+
+async function getOrCreateSocket(): Promise<Socket | null> {
   if (!SOCKET_URL) {
     console.warn("EXPO_PUBLIC_API_URL is missing");
     return null;
   }
-  if (!socket) {
-    socket = io(SOCKET_URL, {
-      transports: ["websocket"],
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,
-      auth: async (cb) => {
-        const token = await AsyncStorage.getItem("@auth_token");
-        cb({ token });
-      },
-    });
+  if (socketSingleton?.connected || socketSingleton?.disconnected === false) {
+    return socketSingleton!;
   }
-  return socket;
+  const token = await AsyncStorage.getItem("@auth_token");
+  socketSingleton = io(SOCKET_URL, {
+    path: "/socket.io",
+    transports: ["websocket"],
+    autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    auth: { token },
+  });
+  return socketSingleton!;
 }
 
 export default function NoteEditor() {
@@ -42,44 +43,64 @@ export default function NoteEditor() {
   }, [title, html]);
 
   useEffect(() => {
-    const socket = getSocket();
-    console.log(socket, id);
-    if (!socket) return;
-    if (!id || !isObjectId(id)) {
-      console.warn("NoteEditor: invalid id, skipping socket join:", id);
-      return;
-    }
+    let socket: Socket | null = null;
+    let mounted = true;
 
-    const onLoad = (n: { title?: string; html?: string }) => {
-      if (typeof n.title === "string") setTitle(n.title);
-      if (typeof n.html === "string") setHtml(n.html);
-    };
+    (async () => {
+      if (!id || !isObjectId(id)) {
+        console.warn("NoteEditor: invalid id, skipping socket join:", id);
+        return;
+      }
 
-    const onUpdate = (n: { title?: string; html?: string }) => {
-      if (typeof n.title === "string") setTitle(n.title);
-      if (typeof n.html === "string") setHtml(n.html);
-    };
+      socket = await getOrCreateSocket();
+      if (!mounted || !socket) return;
 
-    const onSocketError = (payload: { message?: string }) => {
-      console.warn("socket-error:", payload?.message || "Unknown socket error");
-    };
+      const onLoad = (note: { title?: string; html?: string }) => {
+        if (typeof note.title === "string") setTitle(note.title);
+        if (typeof note.html === "string") setHtml(note.html);
+      };
+      const onUpdate = (note: { title?: string; html?: string }) => {
+        if (typeof note.title === "string") setTitle(note.title);
+        if (typeof note.html === "string") setHtml(note.html);
+      };
+      const onSocketError = (payload: { message?: string }) => {
+        console.warn("socket-error:", payload?.message || "Unknown socket error");
+      };
 
-    socket.emit("join", id);
-    socket.on("load-note", onLoad);
-    socket.on("update", onUpdate);
-    socket.on("socket-error", onSocketError);
+      socket.on("load-note", onLoad);
+      socket.on("update", onUpdate);
+      socket.on("socket-error", onSocketError);
+
+      const joinRoom = () => {
+        socket!.emit("join", id, (ok: boolean, msg?: string) => {
+          if (!ok) {
+            console.warn("join failed:", msg);
+          }
+        });
+      };
+
+      if (socket.connected) {
+        joinRoom();
+      } else {
+        socket.once("connect", joinRoom);
+      }
+    })();
 
     return () => {
-      socket.off("load-note", onLoad);
-      socket.off("update", onUpdate);
-      socket.off("socket-error", onSocketError);
-      socket.emit("leave", id);
+      mounted = false;
+      if (socket && id && isObjectId(id)) {
+        socket.emit("leave", id, () => {});
+        socket.off("load-note");
+        socket.off("update");
+        socket.off("socket-error");
+      }
     };
   }, [id]);
 
-  const sendUpdate = (partial: Partial<{ title: string; html: string }>) => {
-    const socket = getSocket();
-    if (!socket || !id || !isObjectId(id)) return;
+  const sendUpdate = async (partial: Partial<{ title: string; html: string }>) => {
+    if (!id || !isObjectId(id)) return;
+    const socket = await getOrCreateSocket();
+    if (!socket) return;
     const payload = {
       id,
       title: partial.title ?? latest.current.title,
