@@ -26,7 +26,7 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://notesapp.lozoya.org:4040"
+        "EXPO_PUBLIC_API_URL": "https://notesapp.lozoya.org"
       }
     }
   },

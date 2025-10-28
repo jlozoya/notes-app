@@ -28,8 +28,7 @@ jobs:
       EAS_ANDROID_READY: ${{ secrets.EAS_ANDROID_READY }}
 
       # Public runtime envs embedded in the app bundle
-      EXPO_PUBLIC_SOCKET_URL: https://notesapp.lozoya.org:4040
-      EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org:4040
+      EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
 
     steps:
       # --- Checkout repo ---
@@ -101,7 +100,7 @@ jobs:
       # Build static web export (Expo SDK 49/50+ outputs to ./dist)
       - name: Build web
         env:
-          EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org:4040
+          EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
         run: npx expo export -p web
 
       # Prepare SSH agent using your Lightsail private key
