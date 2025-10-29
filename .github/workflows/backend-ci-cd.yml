@@ -52,7 +52,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@v1.2.0
         env:
-          PORT: ${{ secrets.BACKEND_PORT }}
+          PORT: ${{ secrets.SERVER_PORT }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -73,8 +73,9 @@ jobs:
 
             APP_ROOT="$HOME/notesapp"
             BACKEND_DIR="$APP_ROOT/backend"
+            BRANCH="${BRANCH:-master}"
 
-            # Ensure git, node, pm2 exist
+            # Ensure tools
             if ! command -v git >/dev/null; then
               sudo apt-get update -y && sudo apt-get install -y git
             fi
@@ -86,59 +87,52 @@ jobs:
               sudo npm i -g pm2
             fi
 
-            # Create folders if they don't exist
-            mkdir -p "$APP_ROOT" "$BACKEND_DIR"
-
-            # Clone or update repo under $APP_ROOT
+            # Clone or hard-reset the repo (idempotent)
+            mkdir -p "$APP_ROOT"
             if [ -d "$APP_ROOT/.git" ]; then
-              echo "Updating existing git repo in $APP_ROOT ..."
+              echo "Resetting repo to origin/$BRANCH..."
               cd "$APP_ROOT"
-              git fetch origin "$BRANCH"
-              git checkout "$BRANCH"
-              git pull --ff-only origin "$BRANCH"
+              git fetch --prune origin
+              git reset --hard "origin/$BRANCH"
+              git clean -fd
             else
-              if [ -d "$APP_ROOT" ] && [ "$(ls -A "$APP_ROOT")" ]; then
-                echo "Directory exists but is not a git repo. Initializing and linking remote..."
-                cd "$APP_ROOT"
-                git init
-                # add or update remote
-                git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL"
-                git fetch origin "$BRANCH"
-                git checkout -B "$BRANCH" "origin/$BRANCH"
-              else
-                echo "Cloning repo into $APP_ROOT ..."
-                git clone --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
-              fi
+              echo "Cloning repo into $APP_ROOT ..."
+              git clone --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
             fi
 
-            # Ensure backend dir exists after clone (create if missing)
+            # Work in backend
             mkdir -p "$BACKEND_DIR"
             cd "$BACKEND_DIR"
 
-            # Write .env from GitHub secrets
+            # .env from secrets (0600)
             umask 0077
             cat > .env <<'EOF'
-            PORT=${{secrets.SERVER_PORT}}
-            MONGO_URI=${{secrets.MONGO_URI}}
-            JWT_SECRET=${{secrets.JWT_SECRET}}
-            SMTP_HOST=${{secrets.SMTP_HOST}}
-            SMTP_PORT=${{secrets.SMTP_PORT}}
-            SMTP_USER=${{secrets.SMTP_USER}}
-            SMTP_PASS=${{secrets.SMTP_PASS}}
-            SMTP_FROM=${{secrets.SMTP_FROM}}
+            PORT=${{ secrets.SERVER_PORT }}
+            MONGO_URI=${{ secrets.MONGO_URI }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASS=${{ secrets.SMTP_PASS }}
+            SMTP_FROM=${{ secrets.SMTP_FROM }}
             EOF
 
-            # Install prod deps & build
+            # Install, build, prune prod deps
+            export NODE_ENV=production
             npm ci
             npm run build
-            npm prune --production
+            npm prune --omit=dev
 
-            # Start / restart with PM2
+            # Figure out entry file (dist by default; adjust if different)
+            ENTRY="dist/index.js"
+            [ -f "dist/index.js" ] || ENTRY="src/index.js"
+
+            # Start / restart PM2
             if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
-              pm2 restart "$APP_NAME"
+              pm2 restart "$APP_NAME" --update-env
             else
-              pm2 start src/index.js --name "$APP_NAME"
+              pm2 start "$ENTRY" --name "$APP_NAME"
             fi
             pm2 save
 
-            echo "Deploy complete at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "Deploy complete at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
