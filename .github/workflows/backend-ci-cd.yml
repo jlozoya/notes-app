@@ -55,6 +55,11 @@ jobs:
           PORT: ${{ secrets.BACKEND_PORT }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
           REPO_URL: https://github.com/jlozoya/notes-app.git
           BRANCH: master
           APP_NAME: notesapp
@@ -62,7 +67,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: PORT,MONGO_URI,JWT_SECRET,REPO_URL,BRANCH,APP_NAME
+          envs: PORT,MONGO_URI,JWT_SECRET,SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_PASS,SMTP_FROM,REPO_URL,BRANCH,APP_NAME
           script: |
             set -euo pipefail
 
@@ -116,6 +121,11 @@ jobs:
             PORT=${{secrets.SERVER_PORT}}
             MONGO_URI=${{secrets.MONGO_URI}}
             JWT_SECRET=${{secrets.JWT_SECRET}}
+            SMTP_HOST=${{secrets.SMTP_HOST}}
+            SMTP_PORT=${{secrets.SMTP_PORT}}
+            SMTP_USER=${{secrets.SMTP_USER}}
+            SMTP_PASS=${{secrets.SMTP_PASS}}
+            SMTP_FROM=${{secrets.SMTP_FROM}}
             EOF
 
             # Install prod deps & build

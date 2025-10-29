@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { useRouter } from "expo-router";
 
-type User = { id: string; email: string } | null;
+type User = { id: string; email: string; emailVerified?: boolean } | null;
 
 type AuthContextType = {
   user: User;
@@ -11,6 +11,10 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (id: string, token: string, password: string) => Promise<void>;
+  setSession: (token: string, user: { id: string; email: string }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -80,6 +84,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  const setSession = async (token: string, user: { id: string; email: string }) => {
+    await AsyncStorage.setItem("@auth_user", JSON.stringify(user));
+    await AsyncStorage.setItem("@auth_token", token);
+    setUser(user);
+    Toast.show({
+      type: "success",
+      text1: "Session set",
+      text2: `Welcome ${user.email}`,
+      position: "bottom",
+      visibilityTime: 3000,
+    });
+  };
+
   const register = async (email: string, password: string) => {
     try {
       const data = await fetchJson<{ token: string; user: { id: string; email: string } }>(
@@ -100,13 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem("@auth_user", JSON.stringify(data.user));
       await AsyncStorage.setItem("@auth_token", data.token);
       setUser(data.user);
-      router.replace("/(app)/notes");
+      router.replace("/(auth)/login");
       Toast.show({
         type: "success",
-        text1: "Account created",
-        text2: `Welcome ${data.user.email}`,
+        text1: "Check your email",
+        text2: "We sent a verification link. Verify to continue.",
         position: "bottom",
-        visibilityTime: 4000,
+        visibilityTime: 4500,
       });
     } catch (error: any) {
       const message = error?.message || "Signup failed";
@@ -123,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const data = await fetchJson<{ token: string; user: { id: string; email: string } }>(
+      const data = await fetchJson<{ token: string; user: { id: string; email: string; emailVerified: boolean; } }>(
         `${API_URL}/api/auth/login`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }
       ).catch((error) => {
@@ -134,6 +151,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           position: "bottom",
           visibilityTime: 4000,
         });
+        if (error.message === "Please verify your email before logging in") {
+          const e = encodeURIComponent(email.trim().toLowerCase());
+          router.replace(`/(auth)/verify?email=${e}`);
+          return;
+        }
       });
       if (!data) {
         return;
@@ -141,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem("@auth_user", JSON.stringify(data.user));
       await AsyncStorage.setItem("@auth_token", data.token);
       setUser(data.user);
+      router.replace("/(auth)/notes");
       Toast.show({
         type: "success",
         text1: "Logged in",
@@ -148,8 +171,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         position: "bottom",
         visibilityTime: 4000,
       });
-    } catch (err: any) {
-      const message = err?.message || "Invalid credentials";
+    } catch (error: any) {
+      const message = error?.message || "Invalid credentials";
       Toast.show({
         type: "error",
         text1: "Login failed",
@@ -183,8 +206,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resendVerification = async (email: string) => {
+    await fetchJson(`${API_URL}/api/auth/resend-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    router.replace("/(auth)/login");
+    Toast.show({ type: "success", text1: "Verification email sent" });
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    await fetchJson(`${API_URL}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    router.replace("/(auth)/login");
+    Toast.show({ type: "success", text1: "Reset link sent" });
+  };
+
+  const resetPassword = async (id: string, token: string, password: string) => {
+    await fetchJson(`${API_URL}/api/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, token, password }),
+    });
+    router.replace("/(auth)/login");
+    Toast.show({ type: "success", text1: "Password updated" });
+  };
+
   const value = useMemo(
-    () => ({ user, loading, signIn, register, signOut }),
+    () => ({
+      user,
+      loading,
+      signIn,
+      register,
+      signOut,
+      resendVerification,
+      requestPasswordReset,
+      resetPassword,
+      setSession,
+    }),
     [user, loading]
   );
 
