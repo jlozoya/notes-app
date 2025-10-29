@@ -1,50 +1,12 @@
-import { Router, Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import { Router, Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { IUser, User } from "../models/User";
 import { sendEmail } from "../lib/mailer";
+import { badRequest, created, generateTokenPair, hashToken, isValidEmail, normalizeEmail, signToken, validatePassword } from "../lib/auth";
 
 const router = Router();
 const APP_URL = process.env.APP_URL || "https://notesapp.lozoya.org";
 
-function signToken(userId: string) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error("JWT_SECRET not configured");
-  return jwt.sign({ id: userId }, secret, { expiresIn: "7d" });
-}
-
-function normalizeEmail(email: string) {
-  return String(email || "").trim().toLowerCase();
-}
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validatePassword(pw: string) {
-  const okLen = typeof pw === "string" && pw.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(pw);
-  const hasNumber = /\d/.test(pw);
-  return okLen && hasLetter && hasNumber;
-}
-
-function badRequest(res: Response, message: string) {
-  return res.status(400).json({ message });
-}
-
-function hashToken(token: string) {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function created(res: Response, payload: any) {
-  return res.status(201).json(payload);
-}
-
-function generateTokenPair() {
-  const token = crypto.randomBytes(32).toString("hex");
-  const tokenHash = hashToken(token);
-  return { token, tokenHash };
-}
 
 router.post("/signup", async (req: Request, res: Response) => {
   try {
@@ -235,7 +197,7 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
     if (!isValidEmail(email)) return badRequest(res, "Invalid email format");
 
     const user: IUser | null = await User.findOne({ email });
-    
+
     if (!user) return res.json({ message: "If an account exists, a reset link has been sent" });
 
     const { token, tokenHash } = generateTokenPair();

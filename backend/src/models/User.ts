@@ -1,5 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
+import { Model } from "mongoose";
+import { DeleteOneModel } from "mongoose";
 
 export interface IUser extends Document {
   _id?: mongoose.Types.ObjectId;
@@ -12,16 +14,21 @@ export interface IUser extends Document {
   passwordResetTokenExp?: Date | null;
   comparePassword(password: string): Promise<boolean>;
   save(): Promise<IUser>;
+  deleteOne(): DeleteOneModel;
 }
-const UserSchema = new Schema<IUser>({
-  email: { type: String, unique: true, required: true, lowercase: true, trim: true },
-  password: { type: String, required: true },
-  emailVerified: { type: Boolean, default: false },
-  emailVerifyTokenHash: { type: String, default: null },
-  emailVerifyExpiresAt: { type: Date, default: null },
-  passwordResetToken: { type: String, default: null },
-  passwordResetTokenExp: { type: Date, default: null },
-}, { timestamps: true });
+
+const UserSchema = new Schema<IUser>(
+  {
+    email: { type: String, unique: true, required: true, lowercase: true, trim: true },
+    password: { type: String, required: true },
+    emailVerified: { type: Boolean, default: false },
+    emailVerifyTokenHash: { type: String, default: null },
+    emailVerifyExpiresAt: { type: Date, default: null },
+    passwordResetToken: { type: String, default: null },
+    passwordResetTokenExp: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
 
 UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
