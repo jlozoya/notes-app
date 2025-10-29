@@ -1,10 +1,19 @@
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { IUser, User } from "../models/User";
 import { sendEmail } from "../lib/mailer";
 import { AuthRequest } from "../middleware/auth";
 import { Note } from "../models/Note";
-import { badRequest, generateTokenPair, isValidEmail, normalizeEmail, signToken, validatePassword } from "../lib/auth";
+import {
+  badRequest,
+  generateTokenPair,
+  isValidEmail,
+  normalizeEmail,
+  signToken,
+  validatePassword,
+} from "../lib/auth";
+import { DeletionRequest } from "../models/DeletionRequest";
 
 const router = Router();
 const APP_URL = process.env.APP_URL || "https://notesapp.lozoya.org";
@@ -20,7 +29,7 @@ function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
     if (!secret) throw new Error("JWT_SECRET not configured");
     const payload = jwt.verify(token, secret) as { id: string; iat: number; exp: number };
     req.userId = payload.id;
-    next();
+    return next();
   } catch {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
@@ -28,6 +37,7 @@ function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
 
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
     const user: IUser | null = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
     return res.json({
@@ -41,16 +51,16 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
 
 router.delete("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.userId!;
-    const user: IUser | null = await User.findById(userId);
+    if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const user: IUser | null = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     await Promise.all([
-      Note.deleteMany({ user: userId }),
+      Note.deleteMany({ user: req.userId }),
     ]);
 
     await user.deleteOne();
-
     return res.status(200).json({ message: "Account permanently deleted" });
   } catch (error) {
     console.error("Delete account error:", error);
@@ -65,6 +75,7 @@ router.post("/update-email", requireAuth, async (req: AuthRequest, res: Response
     if (!newEmail) return badRequest(res, "Email is required");
     if (!isValidEmail(newEmail)) return badRequest(res, "Invalid email format");
 
+    if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
     const user: IUser | null = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -121,6 +132,7 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
       );
     }
 
+    if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
     const user: IUser | null = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -146,6 +158,81 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
   } catch (error) {
     console.error("Change password error:", error);
     return res.status(500).json({ message: "Failed to change password" });
+  }
+});
+
+router.post("/delete-request", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ ok: false, message: "Unauthorized" });
+    }
+
+    const { reason } = (req.body || {}) as { reason?: string };
+    const user = await User.findById(req.userId).lean();
+    if (!user) return res.status(404).json({ ok: false, message: "User not found" });
+
+    let reqDoc = await DeletionRequest.findOne({ userId: req.userId });
+    if (!reqDoc) {
+      const token = crypto.randomBytes(32).toString("hex");
+      reqDoc = await DeletionRequest.create({
+        userId: req.userId,
+        email: user.email,
+        reason,
+        token,
+        status: "pending",
+      });
+    }
+
+    const baseUrl = process.env.PUBLIC_WEB_URL ?? APP_URL;
+    const deleteUrl = `${baseUrl}/api/user/delete/verify?token=${encodeURIComponent(reqDoc.token)}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Confirm deletion request",
+      template: {
+        title: "Confirm deletion request",
+        intro: "Confirm deletion request by clicking the button below:",
+        ctaText: "Delete Account",
+        ctaUrl: deleteUrl,
+      },
+    });
+
+    return res.json({
+      ok: true,
+      message: "Deletion request created. Check your email to verify.",
+      deleteUrl,
+    });
+  } catch (err) {
+    console.error("Create deletion request error:", err);
+    return res.status(500).json({ ok: false, message: "Failed to create deletion request" });
+  }
+});
+
+router.get("/delete/verify", async (req: Request, res: Response) => {
+  try {
+    const { token, redirect } = req.query as { token?: string; redirect?: string };
+    if (!token) return res.status(400).json({ ok: false, message: "Missing token." });
+
+    const reqDoc = await DeletionRequest.findOne({ token });
+    if (!reqDoc) return res.status(400).json({ ok: false, message: "Invalid token." });
+
+    if (reqDoc.status !== "verified") {
+      reqDoc.status = "verified";
+      reqDoc.verifiedAt = new Date();
+      await reqDoc.save();
+    }
+
+    if (redirect === "1") {
+      return res.redirect(`${APP_URL}/login`);
+    }
+
+    return res.json({
+      ok: true,
+      message: "Deletion request verified. An admin/job will complete deletion shortly.",
+    });
+  } catch (err) {
+    console.error("Verify deletion request error:", err);
+    return res.status(500).json({ ok: false, message: "Failed to verify deletion request" });
   }
 });
 
