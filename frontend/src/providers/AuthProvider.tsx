@@ -163,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem("@auth_user", JSON.stringify(data.user));
       await AsyncStorage.setItem("@auth_token", data.token);
       setUser(data.user);
-      router.replace("/(auth)/notes");
+      router.replace("/(app)/notes");
       Toast.show({
         type: "success",
         text1: "Logged in",
