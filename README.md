@@ -145,8 +145,8 @@ This ensures:
   SSLCertificateKeyFile   "/opt/bitnami/apache/conf/notesapp.lozoya.org.key"
 
   # Static web app (Expo web build)
-  DocumentRoot "/home/bitnami/notesapp/frontend"
-  <Directory "/home/bitnami/notesapp/frontend">
+  DocumentRoot "/home/bitnami/notesapp/frontend/dist"
+  <Directory "/home/bitnami/notesapp/frontend/dist">
     Options FollowSymLinks
     AllowOverride None
     Require all granted
@@ -184,7 +184,7 @@ This ensures:
 ✅ This configuration:
 
 * Redirects HTTP → HTTPS
-* Serves your frontend from `/home/bitnami/notesapp/frontend`
+* Serves your frontend from `/home/bitnami/notesapp/frontend/dist`
 * Proxies `/api/*` and `/socket.io/*` requests to your Node backend on `127.0.0.1:4040`
 * Supports real-time WebSocket connections
 

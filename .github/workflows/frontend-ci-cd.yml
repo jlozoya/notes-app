@@ -45,12 +45,14 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+      - name: Ensure target dir exists
+        run: ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p notesapp/frontend/dist"
       - name: Upload web build to Lightsail
         run: |
           rsync -az --delete \
             -e "ssh -o StrictHostKeyChecking=no" \
             ./dist/ \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:notesapp/frontend/
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:notesapp/frontend/dist/
   build-mobile:
     needs: deploy-web
     runs-on: ubuntu-latest
