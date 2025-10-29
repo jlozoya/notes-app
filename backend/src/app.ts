@@ -1,5 +1,6 @@
 import express from "express";
 import cors, { CorsOptions } from "cors";
+import userRoutes from "./routes/user.routes";
 import authRoutes from "./routes/auth.routes";
 import notesRoutes from "./routes/notes.routes";
 
@@ -28,6 +29,7 @@ export function createApp() {
   app.use(cors(corsOptions));
   app.use(express.json());
   app.get("/health", (_req, res) => res.json({ ok: true }));
+  app.use("/api/user", userRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/notes", notesRoutes);
   return app;

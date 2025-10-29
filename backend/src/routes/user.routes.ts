@@ -59,7 +59,7 @@ router.delete("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post("/user/update-email", requireAuth, async (req: AuthRequest, res: Response) => {
+router.post("/update-email", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const newEmailRaw = req.body?.email ?? "";
     const newEmail = normalizeEmail(newEmailRaw);
@@ -109,7 +109,7 @@ router.post("/user/update-email", requireAuth, async (req: AuthRequest, res: Res
   }
 });
 
-router.post("/user/change-password", requireAuth, async (req: AuthRequest, res: Response) => {
+router.post("/change-password", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body ?? {};
     if (!currentPassword || !newPassword) {
@@ -149,3 +149,5 @@ router.post("/user/change-password", requireAuth, async (req: AuthRequest, res: 
     return res.status(500).json({ message: "Failed to change password" });
   }
 });
+
+export default router;
