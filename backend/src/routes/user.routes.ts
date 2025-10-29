@@ -15,6 +15,7 @@ import {
 } from "../lib/auth";
 import { DeletionRequest } from "../models/DeletionRequest";
 import { deleteRequestLimiter } from "../middleware/rateLimit";
+import mongoose, { isValidObjectId } from "mongoose";
 
 const router = Router();
 const APP_URL = process.env.APP_URL || "https://notesapp.lozoya.org";
@@ -162,17 +163,27 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
   }
 });
 
-router.post("/delete-request", deleteRequestLimiter, async (req: Request, res: Response) => {
+router.get("/delete-request", deleteRequestLimiter, async (req: Request, res: Response) => {
   try {
-    const emailRaw = (req.body?.email ?? "") as string;
-    const email = normalizeEmail(emailRaw || "");
-    const OK_MSG = "If an account exists for this email, we’ll send instructions shortly.";
+    const { email: emailRaw, userId: userIdRaw } = req.query as { email?: string; userId?: string };
 
-    if (!email || !isValidEmail(email)) {
+    const OK_MSG = "If an account exists, we'll send instructions shortly.";
+
+    let user: { _id: mongoose.Types.ObjectId; email: string } | null = null;
+
+    if (userIdRaw && isValidObjectId(userIdRaw)) {
+      user = await User.findById(userIdRaw).select("_id email").lean();
+    } else if (typeof emailRaw === "string" && emailRaw.trim()) {
+      const email = normalizeEmail(emailRaw);
+      if (email && isValidEmail(email)) {
+        user = await User.findOne({ email }).select("_id email").lean();
+      } else {
+        return res.json({ ok: true, message: OK_MSG });
+      }
+    } else {
       return res.json({ ok: true, message: OK_MSG });
     }
 
-    const user = await User.findOne({ email }).lean();
     if (!user) {
       return res.json({ ok: true, message: OK_MSG });
     }
@@ -198,6 +209,7 @@ router.post("/delete-request", deleteRequestLimiter, async (req: Request, res: R
     );
 
     const verifyUrl = `${APP_URL}/api/user/delete-verify?token=${encodeURIComponent(token)}`;
+
     await sendEmail({
       to: user.email,
       subject: "Confirm deletion request",
@@ -215,7 +227,7 @@ router.post("/delete-request", deleteRequestLimiter, async (req: Request, res: R
     console.error("Public deletion request error:", error);
     return res.json({
       ok: true,
-      message: "If an account exists for this email, we’ll send instructions shortly.",
+      message: "If an account exists, we'll send instructions shortly.",
     });
   }
 });
