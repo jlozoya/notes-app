@@ -9,7 +9,6 @@ import { badRequest, generateTokenPair, isValidEmail, normalizeEmail, signToken,
 const router = Router();
 const APP_URL = process.env.APP_URL || "https://notesapp.lozoya.org";
 
-
 function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const hdr = req.headers.authorization || "";

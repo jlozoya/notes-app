@@ -218,8 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteAccount = async () => {
-    await fetchAuthJson(`/api/auth/me`, { method: "DELETE" });
-    // clear local session
+    await fetchAuthJson(`/api/user/me`, { method: "DELETE" });
     await AsyncStorage.multiRemove(["@auth_user", "@auth_token"]);
     setUser(null);
     setToken(null);
