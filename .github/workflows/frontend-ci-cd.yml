@@ -40,6 +40,7 @@ jobs:
       - name: Build web
         env:
           EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
+          EXPO_PUBLIC_WEB_BASE: https://notesapp.lozoya.org
         run: npx expo export -p web
       - name: Configure SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -50,6 +51,8 @@ jobs:
       - name: Upload web build to Lightsail
         run: |
           rsync -az --delete \
+            --exclude '.gitignore' \
+            --exclude '.well-known/' \
             -e "ssh -o StrictHostKeyChecking=no" \
             ./dist/ \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:notesapp/frontend/dist/
@@ -63,6 +66,7 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EAS_ANDROID_READY: ${{ secrets.EAS_ANDROID_READY }}
       EXPO_PUBLIC_API_URL: https://notesapp.lozoya.org
+      EXPO_PUBLIC_WEB_BASE: https://notesapp.lozoya.org
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,9 +84,9 @@ jobs:
           npm i -g expo-cli || true
       #- name: Build iOS (EAS)
       #  run: eas build --platform ios --non-interactive --profile production
-      - name: Build Android (EAS)
-        if: env.EAS_ANDROID_READY == '1'
-        run: eas build --platform android --non-interactive --profile production
-      - name: Skip Android (keystore not configured)
-        if: env.EAS_ANDROID_READY != '1'
-        run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' to generate/upload a keystore."
+      #- name: Build Android (EAS)
+      #  if: env.EAS_ANDROID_READY == '1'
+      #  run: eas build --platform android --non-interactive --profile production
+      #- name: Skip Android (keystore not configured)
+      #  if: env.EAS_ANDROID_READY != '1'
+      #  run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' to generate/upload a keystore."

@@ -210,6 +210,7 @@ Ensure `EXPO_PUBLIC_API_URL` points to the production domain:
 
 ```bash
 EXPO_PUBLIC_API_URL=https://notesapp.lozoya.org
+EXPO_PUBLIC_WEB_BASE=https://notesapp.lozoya.org
 ```
 
 This makes all API and WebSocket calls go through Apache’s secure proxy.

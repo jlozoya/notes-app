@@ -56,6 +56,7 @@ Create a `.env` file (or use your CI secrets) with at least:
 ```bash
 # Base API origin (no trailing slash)
 EXPO_PUBLIC_API_URL=https://notesapp.lozoya.org
+EXPO_PUBLIC_WEB_BASE=https://notesapp.lozoya.org
 ```
 
 > All vars prefixed with `EXPO_PUBLIC_` are embedded at build time and available via `process.env.EXPO_PUBLIC_*`.
@@ -154,6 +155,7 @@ Use in components:
 The client uses:
 
 * `EXPO_PUBLIC_API_URL` for REST endpoints (e.g. `https://notesapp.lozoya.org`).
+* `EXPO_PUBLIC_WEB_BASE` to set the domain to share notes (e.g. `https://notesapp.lozoya.org`).
 * A Socket.IO client pointing to the same origin (or a dedicated socket URL if you set one).
 
 > Make sure your backend CORS/socket config allows the app’s origin/scheme.

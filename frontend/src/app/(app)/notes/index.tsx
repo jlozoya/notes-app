@@ -3,6 +3,7 @@ import { Link, router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { FlatList, Platform, Text, TouchableOpacity, View } from "react-native";
 import { deleteNote, getNotes, Note, upsertNote } from "src/lib/notes";
+import ShareNoteButton from "@/components/ShareNoteButton";
 
 export default function NotesList() {
   const [notes, setNotes] = React.useState<Note[]>([]);
@@ -74,6 +75,8 @@ export default function NotesList() {
                 </Text>
               </TouchableOpacity>
             </Link>
+
+            <ShareNoteButton noteId={item.id} title={item.title} />
 
             <TouchableOpacity
               className="px-3 py-2"
