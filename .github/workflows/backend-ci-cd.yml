@@ -104,7 +104,7 @@ jobs:
             mkdir -p "$BACKEND_DIR"
             cd "$BACKEND_DIR"
 
-            # .env from secrets (0600)
+            # Write .env (0600)
             umask 0077
             cat > .env <<'EOF'
             PORT=${{ secrets.SERVER_PORT }}
@@ -117,17 +117,26 @@ jobs:
             SMTP_FROM=${{ secrets.SMTP_FROM }}
             EOF
 
-            # Install, build, prune prod deps
-            export NODE_ENV=production
+            # 1) Install ALL deps (includes dev deps with typescript)
             npm ci
-            npm run build
-            npm prune --omit=dev
 
-            # Figure out entry file (dist by default; adjust if different)
+            # 2) Build TypeScript (uses local devDependency "typescript")
+            # Prefer the script; falls back to npx tsc if needed
+            if npm run --silent build; then
+              echo "Build script finished."
+            else
+              echo "Build script failed; trying npx tsc directly..."
+              npx --yes typescript tsc -p tsconfig.json
+            fi
+
+            # 3) Remove dev deps to slim runtime
+            NODE_ENV=production npm prune --omit=dev
+
+            # 4) Pick entry (dist first, fallback to src)
             ENTRY="dist/index.js"
             [ -f "dist/index.js" ] || ENTRY="src/index.js"
 
-            # Start / restart PM2
+            # 5) PM2 restart
             if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
               pm2 restart "$APP_NAME" --update-env
             else
