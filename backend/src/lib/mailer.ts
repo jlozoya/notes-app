@@ -13,10 +13,6 @@ const {
   LOGO_URL = "",
 } = process.env;
 
-if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
-  throw new Error("SMTP env vars missing: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM");
-}
-
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: Number(SMTP_PORT),
@@ -54,6 +50,10 @@ export async function sendEmail({
   template,
   raw,
 }: MailOptions): Promise<void> {
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
+    throw new Error("SMTP env vars missing: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM");
+  }
+
   let htmlBody: string | undefined;
   let textBody: string | undefined;
 
@@ -72,7 +72,6 @@ export async function sendEmail({
       htmlBody = renderLayout(preHtml);
       textBody = text;
     } else {
-      // nothing provided: minimal branded shell
       htmlBody = renderLayout(`<p style="margin:0">No content.</p>`);
       textBody = "No content.";
     }
@@ -97,7 +96,6 @@ export async function verifyMailer(): Promise<void> {
   console.log("[MAIL] SMTP connection verified");
 }
 
-// ─────────────── Layout / Templates ───────────────
 function renderLayout(innerHtml: string) {
   return `<!doctype html>
 <html lang="en">
@@ -197,15 +195,15 @@ function renderEmailText({
   return lines.join("\n");
 }
 
-// ─────────────── Utils ───────────────
 function cryptoSafeId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
+
 function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
+
 function escapeHtml(str: string) {
-  // ES2015-safe (no replaceAll)
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
