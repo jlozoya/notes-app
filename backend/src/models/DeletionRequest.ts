@@ -7,6 +7,7 @@ export interface IDeletionRequest {
   status: "pending" | "verified" | "completed" | "rejected";
   token: string;
   requestedAt: Date;
+  expiresAt?: Date;
   verifiedAt?: Date;
   completedAt?: Date;
 }
@@ -18,6 +19,7 @@ const DeletionRequestSchema = new Schema<IDeletionRequest>({
   status: { type: String, enum: ["pending","verified","completed","rejected"], default: "pending" },
   token: { type: String, required: true, index: true, unique: true },
   requestedAt: { type: Date, default: Date.now },
+  expiresAt: { type: Date },
   verifiedAt: { type: Date },
   completedAt: { type: Date },
 });

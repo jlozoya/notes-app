@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
 import { IUser, User } from "../models/User";
 import { sendEmail } from "../lib/mailer";
 import { AuthRequest } from "../middleware/auth";
@@ -8,12 +7,14 @@ import { Note } from "../models/Note";
 import {
   badRequest,
   generateTokenPair,
+  hashToken,
   isValidEmail,
   normalizeEmail,
   signToken,
   validatePassword,
 } from "../lib/auth";
 import { DeletionRequest } from "../models/DeletionRequest";
+import { deleteRequestLimiter } from "../middleware/rateLimit";
 
 const router = Router();
 const APP_URL = process.env.APP_URL || "https://notesapp.lozoya.org";
@@ -161,60 +162,76 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
   }
 });
 
-router.post("/delete-request", requireAuth, async (req: AuthRequest, res: Response) => {
+router.post("/delete-request", deleteRequestLimiter, async (req: Request, res: Response) => {
   try {
-    if (!req.userId) {
-      return res.status(401).json({ ok: false, message: "Unauthorized" });
+    const emailRaw = (req.body?.email ?? "") as string;
+    const email = normalizeEmail(emailRaw || "");
+    const OK_MSG = "If an account exists for this email, we’ll send instructions shortly.";
+
+    if (!email || !isValidEmail(email)) {
+      return res.json({ ok: true, message: OK_MSG });
     }
 
-    const { reason } = (req.body || {}) as { reason?: string };
-    const user = await User.findById(req.userId).lean();
-    if (!user) return res.status(404).json({ ok: false, message: "User not found" });
+    const user = await User.findOne({ email }).lean();
+    if (!user) {
+      return res.json({ ok: true, message: OK_MSG });
+    }
 
-    let reqDoc = await DeletionRequest.findOne({ userId: req.userId });
-    if (!reqDoc) {
-      const token = crypto.randomBytes(32).toString("hex");
-      reqDoc = await DeletionRequest.create({
-        userId: req.userId,
+    const token = signToken(String(user._id));
+    const tokenHash = hashToken(token);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    await DeletionRequest.findOneAndUpdate(
+      { userId: user._id },
+      {
+        userId: user._id,
         email: user.email,
-        reason,
-        token,
+        reason: "Public request",
+        tokenHash,
         status: "pending",
-      });
-    }
+        requestedAt: now,
+        verifiedAt: null,
+        expiresAt,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
-    const baseUrl = process.env.PUBLIC_WEB_URL ?? APP_URL;
-    const deleteUrl = `${baseUrl}/api/user/delete/verify?token=${encodeURIComponent(reqDoc.token)}`;
-
+    const verifyUrl = `${APP_URL}/api/user/delete-verify?token=${encodeURIComponent(token)}`;
     await sendEmail({
       to: user.email,
       subject: "Confirm deletion request",
       template: {
         title: "Confirm deletion request",
-        intro: "Confirm deletion request by clicking the button below:",
-        ctaText: "Delete Account",
-        ctaUrl: deleteUrl,
+        intro: "Confirm deletion of your account and data by clicking the button below.",
+        ctaText: "Confirm Deletion",
+        ctaUrl: verifyUrl,
+        expiresText: "This link expires in 24 hours.",
       },
     });
 
+    return res.json({ ok: true, message: OK_MSG });
+  } catch (error) {
+    console.error("Public deletion request error:", error);
     return res.json({
       ok: true,
-      message: "Deletion request created. Check your email to verify.",
-      deleteUrl,
+      message: "If an account exists for this email, we’ll send instructions shortly.",
     });
-  } catch (err) {
-    console.error("Create deletion request error:", err);
-    return res.status(500).json({ ok: false, message: "Failed to create deletion request" });
   }
 });
 
-router.get("/delete/verify", async (req: Request, res: Response) => {
+router.get("/delete-verify", async (req: Request, res: Response) => {
   try {
     const { token, redirect } = req.query as { token?: string; redirect?: string };
     if (!token) return res.status(400).json({ ok: false, message: "Missing token." });
 
-    const reqDoc = await DeletionRequest.findOne({ token });
-    if (!reqDoc) return res.status(400).json({ ok: false, message: "Invalid token." });
+    const tokenHash = hashToken(token);
+    const reqDoc = await DeletionRequest.findOne({ tokenHash });
+
+    if (!reqDoc) return res.status(400).json({ ok: false, message: "Invalid or expired token." });
+    if (reqDoc.expiresAt && reqDoc.expiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ ok: false, message: "Invalid or expired token." });
+    }
 
     if (reqDoc.status !== "verified") {
       reqDoc.status = "verified";
