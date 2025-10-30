@@ -12,6 +12,14 @@ const isObjectId = (v: unknown): v is string =>
 
 let socketSingleton: Socket | null = null;
 
+/**
+ * Returns a singleton Socket.IO client connected to EXPO_PUBLIC_API_URL.
+ * - Reads `@auth_token` from AsyncStorage and sends it via `auth: { token }`
+ * - Reuses an existing socket when available
+ * - Attempts to reconnect if previously disconnected
+ *
+ * @returns A connected or connecting Socket instance, or null if URL is missing.
+ */
 async function getOrCreateSocket(): Promise<Socket | null> {
   if (!SOCKET_URL) {
     console.warn("EXPO_PUBLIC_API_URL is missing");
@@ -39,6 +47,30 @@ async function getOrCreateSocket(): Promise<Socket | null> {
   return socketSingleton;
 }
 
+/**
+ * NoteEditor
+ *
+ * Collaborative editor screen for a single note:
+ * - Validates the `id` route param (must be a MongoDB ObjectId)
+ * - Connects to a singleton Socket.IO instance authenticated with a token from AsyncStorage
+ * - Joins a note room (optionally with a share `code`) and listens for `load-note` / `update`
+ * - Emits debounced `edit` events when the title or HTML changes
+ * - Handles access errors by redirecting to the notes list and showing a toast
+ *
+ * Environment:
+ * - EXPO_PUBLIC_API_URL: Server base URL for Socket.IO (uses `/socket.io` path)
+ *
+ * Dependencies:
+ * - expo-router
+ * - socket.io-client
+ * - @react-native-async-storage/async-storage
+ * - react-native-toast-message
+ * - RichEditor (local component)
+ *
+ * Route params:
+ * - id (string, required): Note ObjectId
+ * - code (string, optional): Share code from global search params
+ */
 export default function NoteEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { code } = useGlobalSearchParams<{ code?: string }>();
@@ -150,6 +182,13 @@ export default function NoteEditor() {
     };
   }, [id, code]);
 
+  /**
+   * Emits a debounced "edit" with the latest title/html.
+   * - Merges partial changes with the last known local state
+   * - Skips if note id is invalid or we already navigated away
+   *
+   * @param partial - Partial update ({ title?, html? })
+   */
   const sendUpdate = async (partial: Partial<{ title: string; html: string }>) => {
     if (!id || !isObjectId(id) || navigatedAway.current) return;
     const socket = await getOrCreateSocket();

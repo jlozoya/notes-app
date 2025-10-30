@@ -1,3 +1,32 @@
+/**
+ * User Routes (Profile, Account Management & Deletion Flow)
+ * ---------------------------------------------------------
+ * Endpoints for authenticated user profile retrieval, account deletion, email change,
+ * password change, and a token-based self-service account deletion request/verification flow.
+ *
+ * Middlewares & Utilities
+ * - `requireAuth` (local): Minimal Bearer JWT validator for endpoints below.
+ * - `deleteRequestLimiter`: Rate limits public deletion requests to mitigate abuse.
+ *
+ * Environment
+ * - APP_URL: Public base URL for building verification links (default: https://notesapp.lozoya.org)
+ *
+ * Endpoints
+ * - GET    /me                 → Get current user profile
+ * - DELETE /me                 → Permanently delete current user (and owned notes)
+ * - POST   /update-email       → Update email and send verification link
+ * - POST   /change-password    → Change password (current → new)
+ * - GET    /delete-request     → Public: request account deletion email (rate limited)
+ * - GET    /delete-verify      → Public: verify deletion request token (optionally redirect)
+ *
+ * Response Conventions
+ * - 401 Unauthorized  → missing/invalid auth
+ * - 404 Not Found     → user doc not found
+ * - 409 Conflict      → email already in use (update-email)
+ * - 400 Bad Request   → validation errors, missing params
+ * - 5xx Server Error  → unexpected failures
+ */
+
 import { Router, Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { IUser, User } from "../models/User";
@@ -18,8 +47,29 @@ import { deleteRequestLimiter } from "../middleware/rateLimit";
 import mongoose, { isValidObjectId } from "mongoose";
 
 const router = Router();
+
+/** Public app URL used in email CTA links. */
 const APP_URL = process.env.APP_URL || "https://notesapp.lozoya.org";
 
+/**
+ * requireAuth
+ * -----------
+ * Minimal Bearer JWT validator for routes that require the authenticated user.
+ *
+ * Behavior
+ * - Expects `Authorization: Bearer <jwt>` header.
+ * - Verifies token with `JWT_SECRET`.
+ * - On success, attaches `req.userId` (payload.id) and calls `next()`.
+ * - On failure, returns 401 with a generic error message.
+ *
+ * Notes
+ * - This middleware is intentionally local and independent of the general `auth` middleware.
+ * - Keep error messages generic to avoid revealing token internals.
+ *
+ * @param req Express request (augmented with `userId` on success)
+ * @param res Express response
+ * @param next Next middleware
+ */
 function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const hdr = req.headers.authorization || "";
@@ -37,6 +87,21 @@ function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   }
 }
 
+/**
+ * GET /me
+ * -------
+ * Returns the authenticated user’s profile.
+ *
+ * Auth: Bearer token required.
+ *
+ * Success
+ * - 200: { user: { id, email, emailVerified } }
+ *
+ * Errors
+ * - 401: Unauthorized (no/invalid token)
+ * - 404: User not found
+ * - 500: Failed to load profile
+ */
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
@@ -51,6 +116,24 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * DELETE /me
+ * ----------
+ * Permanently deletes the authenticated user and their owned notes.
+ *
+ * Auth: Bearer token required.
+ *
+ * Success
+ * - 200: { message: "Account permanently deleted" }
+ *
+ * Errors
+ * - 401: Unauthorized
+ * - 404: User not found
+ * - 500: Failed to delete account
+ *
+ * Notes
+ * - Consider also deleting/cleaning any other data tied to the user (files, sessions, etc.).
+ */
 router.delete("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
@@ -59,6 +142,7 @@ router.delete("/me", requireAuth, async (req: AuthRequest, res: Response) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     await Promise.all([
+      // Delete notes owned by the user. Shared notes owned by others remain untouched.
       Note.deleteMany({ user: req.userId }),
     ]);
 
@@ -70,6 +154,28 @@ router.delete("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * POST /update-email
+ * ------------------
+ * Updates the authenticated user’s email and sends a new verification link
+ * (24-hour expiration). Marks the account as unverified until confirmation.
+ *
+ * Auth: Bearer token required.
+ *
+ * Body
+ * - email: string (required; valid format, normalized)
+ *
+ * Success
+ * - 200: { message, user: { id, email, emailVerified: false } }
+ * - 200 (unchanged): { message: "Email is unchanged", user: {...} }
+ *
+ * Errors
+ * - 400: Invalid/missing email
+ * - 401: Unauthorized
+ * - 404: User not found
+ * - 409: Email already in use
+ * - 500: Failed to update email
+ */
 router.post("/update-email", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const newEmailRaw = req.body?.email ?? "";
@@ -121,6 +227,28 @@ router.post("/update-email", requireAuth, async (req: AuthRequest, res: Response
   }
 });
 
+/**
+ * POST /change-password
+ * ---------------------
+ * Changes the password for the authenticated user.
+ * Requires the current password and a new password meeting policy requirements.
+ * Clears any pending reset tokens, and returns a fresh JWT for immediate use.
+ *
+ * Auth: Bearer token required.
+ *
+ * Body
+ * - currentPassword: string (required)
+ * - newPassword: string (required; must pass `validatePassword`)
+ *
+ * Success
+ * - 200: { message: "Password updated", token, user: { id, email } }
+ *
+ * Errors
+ * - 400: Missing params / weak new password / new == current
+ * - 401: Unauthorized / current password incorrect
+ * - 404: User not found
+ * - 500: Failed to change password
+ */
 router.post("/change-password", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body ?? {};
@@ -163,6 +291,25 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
   }
 });
 
+/**
+ * GET /delete-request
+ * -------------------
+ * Public endpoint to initiate an account deletion flow. If a user matching the provided
+ * `email` or `userId` exists, upserts a `DeletionRequest` with a time-limited token and
+ * sends a confirmation email. Always responds generically to prevent user enumeration.
+ *
+ * Rate Limited: `deleteRequestLimiter`
+ *
+ * Query
+ * - email?:  string (normalized & validated if provided)
+ * - userId?: string (ObjectId)
+ *
+ * Success
+ * - 200: { ok: true, message: "If an account exists, we'll send instructions shortly." }
+ *
+ * Errors
+ * - Always returns 200 with generic message on failure to avoid enumeration.
+ */
 router.get("/delete-request", deleteRequestLimiter, async (req: Request, res: Response) => {
   try {
     const { email: emailRaw, userId: userIdRaw } = req.query as { email?: string; userId?: string };
@@ -188,10 +335,11 @@ router.get("/delete-request", deleteRequestLimiter, async (req: Request, res: Re
       return res.json({ ok: true, message: OK_MSG });
     }
 
+    // Token for verifying deletion request via link (hash persisted)
     const token = signToken(String(user._id));
     const tokenHash = hashToken(token);
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h
 
     await DeletionRequest.findOneAndUpdate(
       { userId: user._id },
@@ -232,6 +380,29 @@ router.get("/delete-request", deleteRequestLimiter, async (req: Request, res: Re
   }
 });
 
+/**
+ * GET /delete-verify
+ * ------------------
+ * Completes the first step of the deletion flow by verifying the request token.
+ * Marks the stored `DeletionRequest` as `verified` (if not already). Optionally
+ * redirects to a front-end route after successful verification.
+ *
+ * Query
+ * - token:    string (required)
+ * - redirect: string (optional; "1" → 302 to `${APP_URL}/login`)
+ *
+ * Success
+ * - 302: Redirect to `${APP_URL}/login` (when `redirect=1`)
+ * - 200: { ok: true, message }
+ *
+ * Errors
+ * - 400: Missing token / invalid or expired token
+ * - 500: Failed to verify deletion request
+ *
+ * Notes
+ * - A background/admin process is expected to act on `verified` requests to perform
+ *   irreversible deletion. This endpoint only verifies the intent.
+ */
 router.get("/delete-verify", async (req: Request, res: Response) => {
   try {
     const { token, redirect } = req.query as { token?: string; redirect?: string };

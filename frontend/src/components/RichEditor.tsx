@@ -3,6 +3,14 @@ import { Keyboard, Platform, View } from "react-native";
 import { RichText, Toolbar, useEditorBridge } from "@10play/tentap-editor";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+/**
+ * A small debounce utility for stable callbacks without re-creating timers.
+ *
+ * @template T A function type whose calls will be debounced.
+ * @param callback The function to invoke after the debounce delay.
+ * @param delay The debounce delay in milliseconds.
+ * @returns A debounced function with the same signature as `callback`.
+ */
 function useDebouncedCallback<T extends (...args: any[]) => void>(callback: T, delay: number) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cbRef = useRef(callback);
@@ -15,12 +23,38 @@ function useDebouncedCallback<T extends (...args: any[]) => void>(callback: T, d
 }
 
 type Props = {
+  /**
+   * Initial HTML string to load into the editor.
+   * If `initialContent` changes and is different from the current editor HTML,
+   * the editor content will be updated. Use this for one-way sync from parent state.
+   */
   initialContent?: string;
+  /**
+   * Debounced change handler that receives the current HTML of the editor.
+   * Called at most once per 500ms while the user types to reduce updates.
+   */
   onChangeHtml?: (html: string) => void;
 };
 
 const TOOLBAR_HEIGHT = 56;
 
+/**
+ * RichEditor
+ *
+ * A cross-platform rich-text editor wrapper built on @10play/tentap-editor.
+ *
+ * Features
+ * - One-way `initialContent` sync with change detection
+ * - Debounced `onChangeHtml` (500ms)
+ * - Keyboard-aware floating toolbar on native (iOS/Android)
+ * - Fixed, horizontally scrollable toolbar on web
+ * - Safe-area handling for devices with bottom insets
+ *
+ * Layout
+ * - The editor area adds bottom padding equal to toolbar height + bottom inset/keyboard height
+ *   to avoid overlap.
+ * - The toolbar anchors above the keyboard on native, or fixed at the bottom on web.
+ */
 export default function RichEditor({ initialContent, onChangeHtml }: Props) {
   const insets = useSafeAreaInsets();
   const lastAppliedHtml = useRef<string | undefined>(initialContent);
@@ -97,8 +131,6 @@ export default function RichEditor({ initialContent, onChangeHtml }: Props) {
                 right: 0,
                 bottom: "env(safe-area-inset-bottom)" as any,
                 zIndex: 1000,
-                // --- overflow handling (web only) ---
-                // cast as any to satisfy TS in RNW
                 ...( {
                   overflowX: "auto",
                   whiteSpace: "nowrap",
@@ -120,7 +152,6 @@ export default function RichEditor({ initialContent, onChangeHtml }: Props) {
       >
         <View
           style={{
-            // keep children in one line and allow scrolling
             ...(isWeb ? ({ display: "inline-flex" } as any) : {}),
             flexDirection: "row",
             flexWrap: "nowrap",
