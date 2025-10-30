@@ -1,6 +1,5 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
-import { Model } from "mongoose";
 import { DeleteOneModel } from "mongoose";
 
 export interface IUser extends Document {
