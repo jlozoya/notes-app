@@ -20,6 +20,8 @@
       "autoIncrement": true,
       "channel": "production",
       "android": {
+        "serviceAccountKeyPath": "./keys/lozoya-430eb-8934adbf2b5f.json",
+        "track": "production",
         "buildType": "app-bundle"
       },
       "ios": {

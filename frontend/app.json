@@ -5,17 +5,37 @@
     "scheme": "acme",
     "userInterfaceStyle": "automatic",
     "orientation": "default",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "web": {
+      "favicon": "./assets/icon.png",
       "reactServerComponentRoutes": true,
       "bundler": "metro",
       "output": "single"
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
       "softwareKeyboardLayoutMode": "resize",
       "package": "org.lozoya.notesapp",
       "runtimeVersion": "1.0.0"
     },
     "ios": {
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
       "bundleIdentifier": "org.lozoya.notesapp",
       "buildNumber": "1.0.0",
       "runtimeVersion": {

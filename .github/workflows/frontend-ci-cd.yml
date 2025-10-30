@@ -90,3 +90,6 @@ jobs:
       #- name: Skip Android (keystore not configured)
       #  if: env.EAS_ANDROID_READY != '1'
       #  run: echo "Skipping Android build. Set repo secret EAS_ANDROID_READY=1 AFTER running 'eas credentials -p android' to generate/upload a keystore."
+      #- name: Write Play service account key
+      #  run: |
+      #    echo "$PLAY_SERVICE_ACCOUNT_JSON_B64" | base64 -d > keys/lozoya-430eb-8934adbf2b5f.json
